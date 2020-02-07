@@ -205,6 +205,13 @@ func FlattenBatchPoolContainerConfiguration(d *schema.ResourceData, armContainer
 	if armContainerConfiguration.Type != nil {
 		result["type"] = *armContainerConfiguration.Type
 	}
+	names := &schema.Set{F: schema.HashString}
+	if armContainerConfiguration.ContainerImageNames != nil {
+		for _, armName := range *armContainerConfiguration.ContainerImageNames {
+			names.Add(string(armName))
+		}
+	}
+	result["container_image_names"] = names
 	result["container_registries"] = flattenBatchPoolContainerRegistries(d, armContainerConfiguration.ContainerRegistries)
 
 	return []interface{}{result}
@@ -312,6 +319,15 @@ func ExpandBatchPoolContainerConfiguration(list []interface{}) (*batch.Container
 
 	containerConfiguration := list[0].(map[string]interface{})
 	containerType := containerConfiguration["type"].(string)
+
+	containerNameRefs := containerConfiguration["container_image_names"].(*schema.Set)
+	var containerImageNames []string
+	if containerNameRefs != nil {
+		for _, nameRef := range containerNameRefs.List() {
+			containerImageNames = append(containerImageNames, nameRef.(string))
+		}
+	}
+
 	containerRegistries, err := expandBatchPoolContainerRegistries(containerConfiguration["container_registries"].([]interface{}))
 	if err != nil {
 		return nil, err
@@ -319,6 +335,7 @@ func ExpandBatchPoolContainerConfiguration(list []interface{}) (*batch.Container
 
 	containerConf := &batch.ContainerConfiguration{
 		Type:                &containerType,
+		ContainerImageNames: &containerImageNames,
 		ContainerRegistries: containerRegistries,
 	}
 
